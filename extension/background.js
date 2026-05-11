@@ -20,45 +20,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // Always forward updates to the app so it can manage the full session list
         // main.js will handle which one to show as the "current" track
-        request.data.tabId = tabId; // Ensure current data has tabId
-        
-        const payload = {
-            current: request.data,
-            allSessions: Object.values(sessions).sort((a, b) => a.tabId - b.tabId)
-        };
-
-        fetch('http://localhost:3456/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(commands => {
-            if (!Array.isArray(commands)) return;
+        chrome.storage.local.get(['dynamicTheming', 'visualizer', 'scrollingTitle'], (settings) => {
+            request.data.tabId = tabId;
+            request.data.settings = {
+                dynamicTheming: settings.dynamicTheming !== false,
+                visualizer: settings.visualizer !== false,
+                scrollingTitle: settings.scrollingTitle !== false
+            };
             
-            commands.forEach(cmd => {
-                if (cmd.command === 'play-tab') {
-                    const targetTabId = parseInt(cmd.tabId);
-                    if (activeTabId !== null && activeTabId !== targetTabId) {
-                        chrome.tabs.sendMessage(activeTabId, { command: 'pause' }).catch(() => {});
-                    }
-                    chrome.tabs.sendMessage(targetTabId, { command: 'play' }).catch(() => {});
-                    activeTabId = targetTabId;
-                } else if (cmd.command === 'focus-tab') {
-                    const targetTabId = parseInt(cmd.tabId);
-                    chrome.tabs.get(targetTabId, (tab) => {
-                        if (tab) {
-                            chrome.tabs.update(targetTabId, { active: true });
-                            chrome.windows.update(tab.windowId, { 
-                                focused: true,
-                                drawAttention: true
-                            });
+            const payload = {
+                current: request.data,
+                allSessions: Object.values(sessions).sort((a, b) => a.tabId - b.tabId)
+            };
+
+            fetch('http://localhost:3456/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(commands => {
+                if (!Array.isArray(commands)) return;
+                
+                commands.forEach(cmd => {
+                    if (cmd.command === 'play-tab') {
+                        const targetTabId = parseInt(cmd.tabId);
+                        if (activeTabId !== null && activeTabId !== targetTabId) {
+                            chrome.tabs.sendMessage(activeTabId, { command: 'pause' }).catch(() => {});
                         }
-                    });
-                }
-            });
-        })
-        .catch(err => {});
+                        chrome.tabs.sendMessage(targetTabId, { command: 'play' }).catch(() => {});
+                        activeTabId = targetTabId;
+                    } else if (cmd.command === 'focus-tab') {
+                        const targetTabId = parseInt(cmd.tabId);
+                        chrome.tabs.get(targetTabId, (tab) => {
+                            if (tab) {
+                                chrome.tabs.update(targetTabId, { active: true });
+                                chrome.windows.update(tab.windowId, { 
+                                    focused: true,
+                                    drawAttention: true
+                                });
+                            }
+                        });
+                    }
+                });
+            })
+            .catch(err => {});
+        });
     }
 });
 

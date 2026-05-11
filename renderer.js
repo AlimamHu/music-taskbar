@@ -7,12 +7,25 @@ const playSvg = document.getElementById('play-svg');
 const title = document.getElementById('title');
 const artist = document.getElementById('artist');
 const sourceIcon = document.getElementById('source-icon');
-
-let isPlaying = false;
-
+const thumbnail = document.getElementById('thumbnail');
 const container = document.getElementById('app-container');
 const toggleMini = document.getElementById('toggle-mini');
 const closeApp = document.getElementById('close-app');
+const progressBar = document.getElementById('progress-bar');
+const vizContainer = document.getElementById('visualizer-container');
+
+let isPlaying = false;
+let allSessions = [];
+let lastRealData = null;
+let peekIndex = -1;
+let peekTimer = null;
+
+// Initialize Visualizer Bars
+for (let i = 0; i < 4; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'visualizer-bar';
+    vizContainer.appendChild(bar);
+}
 
 // Mini Mode Toggle
 toggleMini.addEventListener('click', () => {
@@ -30,55 +43,18 @@ document.getElementById('track-section').addEventListener('dblclick', () => {
     ipcRenderer.send('focus-source', tabId);
 });
 
-// Play/Pause
+// Controls
 playBtn.addEventListener('click', () => {
     ipcRenderer.send('media-command', 'play-pause');
-    // Instant UI feedback for better feel
-    isPlaying = !isPlaying;
-    updatePlayUI();
 });
 
-// Previous
 prevBtn.addEventListener('click', () => {
     ipcRenderer.send('media-command', 'prev');
 });
 
-// Next
 nextBtn.addEventListener('click', () => {
     ipcRenderer.send('media-command', 'next');
 });
-
-function updatePlayUI() {
-    if (isPlaying) {
-        playSvg.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause
-    } else {
-        playSvg.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play
-    }
-}
-
-let currentProgress = 0;
-let currentDuration = 0;
-let progressInterval;
-
-function startProgressTimer() {
-    if (progressInterval) clearInterval(progressInterval);
-    progressInterval = setInterval(() => {
-        if (isPlaying && currentProgress < currentDuration) {
-            currentProgress += 0.1;
-            updateProgressBar();
-        }
-    }, 100);
-}
-
-function updateProgressBar() {
-    const progressBar = document.getElementById('progress-bar');
-    if (currentDuration > 0) {
-        const percent = (currentProgress / currentDuration) * 100;
-        progressBar.style.width = `${percent}%`;
-    } else {
-        progressBar.style.width = '0%';
-    }
-}
 
 // Tabs Panel Toggle
 const tabsBtn = document.getElementById('show-tabs');
@@ -95,58 +71,128 @@ closeTabs.addEventListener('click', () => {
     tabsPanel.classList.remove('open');
 });
 
-let allSessions = [];
-let lastRealData = null;
-let peekIndex = -1;
-let peekTimer = null;
+// Dynamic Theming helper
+async function getDominantColor(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = url;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 10;
+            canvas.height = 10;
+            ctx.drawImage(img, 0, 0, 10, 10);
+            const data = ctx.getImageData(0, 0, 10, 10).data;
+            
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i]; g += data[i+1]; b += data[i+2];
+            }
+            const count = data.length / 4;
+            resolve(`rgb(${Math.round(r/count)}, ${Math.round(g/count)}, ${Math.round(b/count)})`);
+        };
+        img.onerror = () => resolve('#00ff00');
+    });
+}
 
-function renderMedia(data) {
+async function renderMedia(data) {
     if (!data || !data.Title) return;
 
-    // Clean up title
+    // Apply Settings
+    const settings = data.settings || { dynamicTheming: true, visualizer: true, scrollingTitle: true };
+    
+    // Toggle Visualizer
+    vizContainer.style.display = settings.visualizer ? 'flex' : 'none';
+    if (data.Status === 'Playing') {
+        vizContainer.classList.add('playing');
+        playSvg.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause
+    } else {
+        vizContainer.classList.remove('playing');
+        playSvg.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play
+    }
+
+    // Toggle Dynamic Theming
+    if (settings.dynamicTheming && data.Thumbnail) {
+        const color = await getDominantColor(data.Thumbnail);
+        document.documentElement.style.setProperty('--accent-youtube', color);
+        document.documentElement.style.setProperty('--accent-spotify', color);
+        progressBar.style.boxShadow = `0 0 15px ${color}, 0 0 5px ${color}`;
+    } else {
+        document.documentElement.style.setProperty('--accent-youtube', '#00ff00');
+        document.documentElement.style.setProperty('--accent-spotify', '#00ff00');
+        progressBar.style.boxShadow = `0 0 15px #00ff00, 0 0 5px #00ff00`;
+    }
+
+    // Update Text
     let displayTitle = data.Title.replace(/ - YouTube Music$/i, '').replace(/ - YouTube$/i, '').trim();
-    let displayArtist = data.Artist || "Unknown Artist";
-
-    if (displayTitle.toLowerCase() === 'youtube music' || displayTitle.toLowerCase() === 'youtube') {
-        displayTitle = "Music";
-    }
-
+    if (displayTitle.toLowerCase() === 'youtube music' || displayTitle.toLowerCase() === 'youtube') displayTitle = "Music";
+    
     title.innerText = displayTitle;
-    artist.innerText = displayArtist;
+    artist.innerText = data.Artist || "Unknown Artist";
 
-    // Sync Progress
-    currentProgress = data.Progress || 0;
-    currentDuration = data.Duration || 0;
-    updateProgressBar();
-    
-    isPlaying = (data.Status === 'Playing' || data.Status === 'playing');
-    updatePlayUI();
-    
-    if (isPlaying) {
-        startProgressTimer();
+    // Seamless Scrolling Title Logic
+    const wrapper = title.parentElement;
+    const isGeneric = displayTitle.toLowerCase() === 'music' || 
+                     displayTitle.toLowerCase() === 'youtube' || 
+                     displayTitle.toLowerCase() === 'youtube music';
+
+    if (settings.scrollingTitle && !isGeneric) {
+        setTimeout(() => {
+            const containerWidth = wrapper.offsetWidth;
+            const textWidth = title.scrollWidth - 50; 
+            
+            if (textWidth > containerWidth) {
+                const existing = wrapper.querySelectorAll('.title-dup');
+                existing.forEach(e => e.remove());
+                
+                const dup = title.cloneNode(true);
+                dup.id = "";
+                dup.className = "title-dup";
+                wrapper.appendChild(dup);
+                
+                title.classList.add('scrolling');
+                dup.classList.add('scrolling');
+                
+                const duration = Math.max(8, textWidth / 25); 
+                title.style.animationDuration = `${duration}s`;
+                dup.style.animationDuration = `${duration}s`;
+            } else {
+                title.classList.remove('scrolling');
+                const existing = wrapper.querySelectorAll('.title-dup');
+                existing.forEach(e => e.remove());
+            }
+        }, 50);
     } else {
-        if (progressInterval) clearInterval(progressInterval);
+        title.classList.remove('scrolling');
+        const existing = wrapper.querySelectorAll('.title-dup');
+        existing.forEach(e => e.remove());
     }
-
-    const thumb = document.getElementById('thumbnail');
-    if (data.Thumbnail && data.Thumbnail.startsWith('http')) {
-        thumb.src = data.Thumbnail;
-        thumb.style.display = 'block';
-        container.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6)), url('${data.Thumbnail}')`;
+    
+    // Update Thumbnail
+    if (data.Thumbnail) {
+        thumbnail.src = data.Thumbnail;
+        thumbnail.style.display = 'block';
+        container.style.backgroundImage = `linear-gradient(rgba(15, 15, 15, 0.8), rgba(15, 15, 15, 0.8)), url(${data.Thumbnail})`;
     } else {
-        thumb.src = 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
-        thumb.style.display = 'block';
+        thumbnail.style.display = 'none';
         container.style.backgroundImage = 'none';
     }
     
+    // Update Progress
+    if (data.Duration > 0) {
+        const percent = (data.Progress / data.Duration) * 100;
+        progressBar.style.width = percent + '%';
+    } else {
+        progressBar.style.width = '0%';
+    }
+
     // Update Source Icon
     const isYTMusic = data.Method === 'YouTube Music';
-    const isYouTube = data.Title.toLowerCase().includes('youtube') || 
-                      (data.Artist && data.Artist.toLowerCase().includes('youtube')) || 
-                      data.Method === 'YouTube';
+    const isYouTube = data.Method === 'YouTube';
                       
     if (isYTMusic) {
-        sourceIcon.innerText = "♬"; // Music note for YT Music
+        sourceIcon.innerText = "♬";
         sourceIcon.className = "source-ytmusic";
     } else if (isYouTube) {
         sourceIcon.innerText = "▶";
@@ -160,12 +206,10 @@ function renderMedia(data) {
 // Scroll to Peek
 container.addEventListener('wheel', (e) => {
     if (allSessions.length <= 1) return;
-    
     e.preventDefault();
     if (peekTimer) clearTimeout(peekTimer);
     
     if (peekIndex === -1) {
-        // Start from active or first
         peekIndex = allSessions.findIndex(s => s.Status === 'Playing');
         if (peekIndex === -1) peekIndex = 0;
     }
@@ -194,7 +238,7 @@ document.getElementById('track-section').addEventListener('click', () => {
     }
 });
 
-// Update Tabs List
+// Listen for updates
 ipcRenderer.on('sessions-update', (event, sessions) => {
     allSessions = sessions;
     tabCount.innerText = sessions.length;
@@ -203,7 +247,6 @@ ipcRenderer.on('sessions-update', (event, sessions) => {
     sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = `tab-item ${session.Status === 'Playing' ? 'active' : ''}`;
-        
         const cleanTitle = session.Title.replace(/ - YouTube Music$/i, '').replace(/ - YouTube$/i, '').trim();
         const thumb = session.Thumbnail || 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
         
@@ -222,7 +265,7 @@ ipcRenderer.on('sessions-update', (event, sessions) => {
         });
 
         item.addEventListener('dblclick', (e) => {
-            e.stopPropagation(); // Prevent trigger click
+            e.stopPropagation();
             ipcRenderer.send('focus-source', session.tabId);
         });
         
@@ -230,18 +273,7 @@ ipcRenderer.on('sessions-update', (event, sessions) => {
     });
 });
 
-// Listen for real-time media updates
 ipcRenderer.on('media-update', (event, data) => {
     lastRealData = data;
-    // Only update UI if we are not currently peeking
-    if (peekIndex === -1) {
-        renderMedia(data);
-    }
+    if (peekIndex === -1) renderMedia(data);
 });
-
-/* 
-   NOTE FOR PRODUCTION:
-   To connect to actual Windows Global Media (YouTube/Spotify):
-   You would use a library like 'node-windows-media-controls' 
-   which interfaces with the Windows SMTC API.
-*/
