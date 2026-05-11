@@ -31,6 +31,21 @@
             <button id="next" class="btn">
                 <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
             </button>
+            <button id="show-tabs" class="btn" title="Media Tabs">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                <span id="tab-count" class="badge">0</span>
+            </button>
+        </div>
+
+        <!-- Sliding Tabs Panel -->
+        <div id="tabs-panel" class="tabs-panel">
+            <div class="tabs-header">
+                <span>Active Sessions</span>
+                <button id="close-tabs">✕</button>
+            </div>
+            <div id="tabs-list" class="tabs-list">
+                <!-- Tabs will be injected here -->
+            </div>
         </div>
 
         <div id="progress-container">

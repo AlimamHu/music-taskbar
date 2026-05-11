@@ -6,6 +6,9 @@ const http = require('http');
 let mainWindow;
 let lastGoodUpdate = 0; // Timestamp of last detailed update (Extension or SMTC)
 let lastReceivedTitle = ""; // For window focusing
+let currentPlaybackStatus = "Stopped";
+let currentPlaybackSource = "";
+let commandQueue = [];
 
 // Extension Listener
 function startServer() {
@@ -26,24 +29,45 @@ function startServer() {
             req.on('data', chunk => { body += chunk.toString(); });
             req.on('end', () => {
                 try {
-                    const data = JSON.parse(body);
+                    const payload = JSON.parse(body);
+                    const data = payload.current || payload; // Support old and new format
+                    
                     if (mainWindow && data.Title) {
-                        lastGoodUpdate = Date.now(); // Mark as high-quality data
-                        lastReceivedTitle = data.Title;
-                        mainWindow.webContents.send('media-update', data);
+                        const isPlaying = data.Status === 'Playing' || data.Status === 'playing';
+                        const sourceId = data.Title + data.Artist;
+
+                        if (isPlaying || currentPlaybackStatus !== 'Playing' || currentPlaybackSource === sourceId) {
+                            currentPlaybackStatus = isPlaying ? 'Playing' : 'Paused';
+                            currentPlaybackSource = sourceId;
+                            lastGoodUpdate = Date.now();
+                            lastReceivedTitle = data.Title;
+                            mainWindow.webContents.send('media-update', data);
+                        }
+
+                        // Send all sessions to renderer
+                        if (payload.allSessions) {
+                            mainWindow.webContents.send('sessions-update', payload.allSessions);
+                        }
                     }
                 } catch (e) {
                     console.error('Failed to parse POST body:', e);
                 }
-                res.writeHead(200, { 'Content-Type': 'text/plain' });
-                res.end('ok');
+                
+                // Send back any pending commands
+                const nextCmd = commandQueue.shift() || { status: 'ok' };
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(nextCmd));
             });
         } else {
             res.writeHead(404);
             res.end();
         }
-    }).listen(3456); // Listen on all local interfaces
+    }).listen(3456);
 }
+
+ipcMain.on('switch-tab', (event, tabId) => {
+    commandQueue.push({ command: 'play-tab', tabId: tabId });
+});
 
 function createWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -117,15 +141,23 @@ function startMediaPolling() {
 
         const foundData = JSON.parse(trimmed);
         if (foundData && foundData.Title && mainWindow) {
+          const isPlaying = foundData.Status === 'Playing' || foundData.Status === 'playing';
+          const sourceId = foundData.Title + foundData.Artist;
           
           // Only use Method 2 (Window Title) if we haven't had a good update in 5 seconds
           const isWeakData = (foundData.Method === 'Spotify' || foundData.Method === 'YouTube');
           const timeSinceGoodUpdate = Date.now() - lastGoodUpdate;
 
           if (!isWeakData || timeSinceGoodUpdate > 5000) {
-              if (!isWeakData) lastGoodUpdate = Date.now();
-              lastReceivedTitle = foundData.Title;
-              mainWindow.webContents.send('media-update', foundData);
+              // Priority check across sources
+              if (isPlaying || currentPlaybackStatus !== 'Playing' || currentPlaybackSource === sourceId) {
+                  currentPlaybackStatus = isPlaying ? 'Playing' : 'Paused';
+                  currentPlaybackSource = sourceId;
+                  
+                  if (!isWeakData) lastGoodUpdate = Date.now();
+                  lastReceivedTitle = foundData.Title;
+                  mainWindow.webContents.send('media-update', foundData);
+              }
           }
         }
       } catch (e) {
@@ -147,8 +179,13 @@ ipcMain.on('media-command', (event, command) => {
   }
 });
 
-ipcMain.on('focus-source', () => {
-    // Try to find the window by the current playing title
+ipcMain.on('focus-source', (event, tabId) => {
+    if (tabId) {
+        commandQueue.push({ command: 'focus-tab', tabId: tabId });
+    }
+    
+    // Always try the PowerShell fallback as well, in case it's a desktop app or 
+    // to bring the browser window itself to the foreground via OS
     const cleanTitle = lastReceivedTitle.split(' - ')[0].replace(/"/g, ''); 
     const psScript = `
       $wshell = New-Object -ComObject WScript.Shell;

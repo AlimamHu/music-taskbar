@@ -52,16 +52,17 @@ body {
 
 .window-controls {
     position: absolute;
-    top: -20px; /* Hidden by default, shows on hover */
-    right: 0;
+    top: -20px;
+    left: 45px; /* Moved to left side to avoid blocking playback buttons */
     display: flex;
     gap: 4px;
     -webkit-app-region: no-drag;
     transition: top 0.2s;
+    z-index: 100;
 }
 
 .container:hover .window-controls {
-    top: 4px;
+    top: 2px;
 }
 
 .mini-btn {
@@ -165,4 +166,127 @@ body {
     width: 16px;
     height: 16px;
     fill: white;
+}
+
+/* New Session Switcher Styles */
+#show-tabs {
+    position: relative;
+}
+
+.badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #00ff00;
+    color: black;
+    font-size: 8px;
+    font-weight: bold;
+    min-width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 5px rgba(0,255,0,0.5);
+}
+
+.tabs-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 300px;
+    height: 100%;
+    background: rgba(10, 10, 10, 0.95);
+    backdrop-filter: blur(30px);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
+    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    -webkit-app-region: no-drag;
+}
+
+.tabs-panel.open {
+    right: 0;
+}
+
+.tabs-header {
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+#close-tabs {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.tabs-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.tab-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 2px;
+}
+
+.tab-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-item.active {
+    background: rgba(0, 255, 0, 0.1);
+    border: 1px solid rgba(0, 255, 0, 0.2);
+}
+
+.tab-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.tab-info {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-title {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-artist {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-status {
+    font-size: 12px;
+    color: #00ff00;
 }

@@ -26,7 +26,8 @@ closeApp.addEventListener('click', () => {
 
 // Double click to open source
 container.addEventListener('dblclick', () => {
-    ipcRenderer.send('focus-source');
+    const tabId = lastRealData ? lastRealData.tabId : null;
+    ipcRenderer.send('focus-source', tabId);
 });
 
 // Play/Pause
@@ -79,63 +80,153 @@ function updateProgressBar() {
     }
 }
 
-// Listen for real-time media updates from Windows or Browser Extension
+// Tabs Panel Toggle
+const tabsBtn = document.getElementById('show-tabs');
+const tabsPanel = document.getElementById('tabs-panel');
+const closeTabs = document.getElementById('close-tabs');
+const tabsList = document.getElementById('tabs-list');
+const tabCount = document.getElementById('tab-count');
+
+tabsBtn.addEventListener('click', () => {
+    tabsPanel.classList.toggle('open');
+});
+
+closeTabs.addEventListener('click', () => {
+    tabsPanel.classList.remove('open');
+});
+
+let allSessions = [];
+let lastRealData = null;
+let peekIndex = -1;
+let peekTimer = null;
+
+function renderMedia(data) {
+    if (!data || !data.Title) return;
+
+    // Clean up title
+    let displayTitle = data.Title.replace(/ - YouTube Music$/i, '').replace(/ - YouTube$/i, '').trim();
+    let displayArtist = data.Artist || "Unknown Artist";
+
+    if (displayTitle.toLowerCase() === 'youtube music' || displayTitle.toLowerCase() === 'youtube') {
+        displayTitle = "Music";
+    }
+
+    title.innerText = displayTitle;
+    artist.innerText = displayArtist;
+
+    // Sync Progress
+    currentProgress = data.Progress || 0;
+    currentDuration = data.Duration || 0;
+    updateProgressBar();
+    
+    isPlaying = (data.Status === 'Playing' || data.Status === 'playing');
+    updatePlayUI();
+    
+    if (isPlaying) {
+        startProgressTimer();
+    } else {
+        if (progressInterval) clearInterval(progressInterval);
+    }
+
+    const thumb = document.getElementById('thumbnail');
+    if (data.Thumbnail && data.Thumbnail.startsWith('http')) {
+        thumb.src = data.Thumbnail;
+        thumb.style.display = 'block';
+        container.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6)), url('${data.Thumbnail}')`;
+    } else {
+        thumb.src = 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
+        thumb.style.display = 'block';
+        container.style.backgroundImage = 'none';
+    }
+    
+    // Update Source Icon
+    const isYouTube = data.Title.toLowerCase().includes('youtube') || 
+                      (data.Artist && data.Artist.toLowerCase().includes('youtube')) || 
+                      data.Method === 'YouTube' || data.Method === 'YouTube Music';
+                      
+    if (isYouTube) {
+        sourceIcon.innerText = "▶";
+        sourceIcon.className = "source-youtube";
+    } else {
+        sourceIcon.innerText = "●";
+        sourceIcon.className = "source-spotify";
+    }
+}
+
+// Scroll to Peek
+container.addEventListener('wheel', (e) => {
+    if (allSessions.length <= 1) return;
+    
+    e.preventDefault();
+    if (peekTimer) clearTimeout(peekTimer);
+    
+    if (peekIndex === -1) {
+        // Start from active or first
+        peekIndex = allSessions.findIndex(s => s.Status === 'Playing');
+        if (peekIndex === -1) peekIndex = 0;
+    }
+    
+    if (e.deltaY > 0) peekIndex++;
+    else peekIndex--;
+    
+    if (peekIndex >= allSessions.length) peekIndex = 0;
+    if (peekIndex < 0) peekIndex = allSessions.length - 1;
+    
+    renderMedia(allSessions[peekIndex]);
+    
+    peekTimer = setTimeout(() => {
+        peekIndex = -1;
+        if (lastRealData) renderMedia(lastRealData);
+    }, 5000);
+});
+
+// Click to Confirm Peek
+document.getElementById('track-section').addEventListener('click', () => {
+    if (peekIndex !== -1) {
+        const session = allSessions[peekIndex];
+        ipcRenderer.send('switch-tab', session.tabId);
+        if (peekTimer) clearTimeout(peekTimer);
+        peekIndex = -1;
+    }
+});
+
+// Update Tabs List
+ipcRenderer.on('sessions-update', (event, sessions) => {
+    allSessions = sessions;
+    tabCount.innerText = sessions.length;
+    tabsList.innerHTML = '';
+    
+    sessions.forEach(session => {
+        const item = document.createElement('div');
+        item.className = `tab-item ${session.Status === 'Playing' ? 'active' : ''}`;
+        
+        const cleanTitle = session.Title.replace(/ - YouTube Music$/i, '').replace(/ - YouTube$/i, '').trim();
+        const thumb = session.Thumbnail || 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
+        
+        item.innerHTML = `
+            <img class="tab-thumb" src="${thumb}">
+            <div class="tab-info">
+                <div class="tab-title">${cleanTitle}</div>
+                <div class="tab-artist">${session.Artist || "Unknown"}</div>
+            </div>
+            <div class="tab-status">${session.Status === 'Playing' ? '▶' : ''}</div>
+        `;
+        
+        item.addEventListener('click', () => {
+            ipcRenderer.send('switch-tab', session.tabId);
+            tabsPanel.classList.remove('open');
+        });
+        
+        tabsList.appendChild(item);
+    });
+});
+
+// Listen for real-time media updates
 ipcRenderer.on('media-update', (event, data) => {
-    if (data && data.Title) {
-        // Clean up title
-        let displayTitle = data.Title.replace(/ - YouTube Music$/i, '').replace(/ - YouTube$/i, '').trim();
-        let displayArtist = data.Artist || "Unknown Artist";
-
-        // If it's a weak update and we already have a better title, don't overwrite
-        if (displayTitle.toLowerCase() === 'youtube music' && title.innerText !== 'Scanning...' && title.innerText !== 'Music') {
-            return; 
-        }
-
-        if (displayTitle.toLowerCase() === 'youtube music' || displayTitle.toLowerCase() === 'youtube') {
-            displayTitle = "Music";
-        }
-
-        title.innerText = displayTitle;
-        artist.innerText = displayArtist;
-
-        // Sync Progress
-        currentProgress = data.Progress || 0;
-        currentDuration = data.Duration || 0;
-        updateProgressBar();
-        
-        isPlaying = (data.Status === 'Playing' || data.Status === 'playing');
-        updatePlayUI();
-        
-        if (isPlaying) {
-            startProgressTimer();
-        } else {
-            if (progressInterval) clearInterval(progressInterval);
-        }
-
-        const thumb = document.getElementById('thumbnail');
-        if (data.Thumbnail && data.Thumbnail.startsWith('http')) {
-            thumb.src = data.Thumbnail;
-            thumb.style.display = 'block';
-            // Darker overlay for better text contrast
-            container.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6)), url('${data.Thumbnail}')`;
-        } else {
-            thumb.src = 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
-            thumb.style.display = 'block';
-            container.style.backgroundImage = 'none';
-        }
-        
-        // Update Source Icon
-        const isYouTube = data.Title.toLowerCase().includes('youtube') || 
-                          (data.Artist && data.Artist.toLowerCase().includes('youtube')) || 
-                          data.Method === 'YouTube' || data.Method === 'YouTube Music';
-                          
-        if (isYouTube) {
-            sourceIcon.innerText = "▶";
-            sourceIcon.className = "source-youtube";
-        } else {
-            sourceIcon.innerText = "●";
-            sourceIcon.className = "source-spotify";
-        }
+    lastRealData = data;
+    // Only update UI if we are not currently peeking
+    if (peekIndex === -1) {
+        renderMedia(data);
     }
 });
 
