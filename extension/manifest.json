@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Taskbar Music Link",
+  "version": "1.0",
+  "description": "Sends YouTube/Spotify music data to the taskbar controller.",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": ["http://localhost:3456/*", "https://*.youtube.com/*", "https://*.spotify.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*", "https://*.spotify.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
