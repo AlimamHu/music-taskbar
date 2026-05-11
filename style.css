@@ -219,17 +219,54 @@ body {
     justify-content: center;
     border-radius: 4px;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bounce back curve */
+    position: relative;
+    overflow: hidden;
 }
 
 .btn:hover {
     background: var(--hover-color);
+    transform: scale(1.1);
+}
+
+.btn:active {
+    transform: scale(0.9);
+}
+
+/* Ripple Effect */
+.btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.4);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+@keyframes ripple {
+    0% { transform: scale(0, 0); opacity: 1; }
+    20% { transform: scale(25, 25); opacity: 1; }
+    100% { opacity: 0; transform: scale(40, 40); }
+}
+
+.btn:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
 }
 
 .btn svg {
     width: 16px;
     height: 16px;
     fill: white;
+    transition: transform 0.2s;
+}
+
+.btn:active svg {
+    transform: scale(0.8);
 }
 
 /* New Session Switcher Styles */
