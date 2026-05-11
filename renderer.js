@@ -24,6 +24,11 @@ closeApp.addEventListener('click', () => {
     ipcRenderer.send('window-command', 'close');
 });
 
+// Double click to open source
+container.addEventListener('dblclick', () => {
+    ipcRenderer.send('focus-source');
+});
+
 // Play/Pause
 playBtn.addEventListener('click', () => {
     ipcRenderer.send('media-command', 'play-pause');
@@ -108,14 +113,14 @@ ipcRenderer.on('media-update', (event, data) => {
         }
 
         const thumb = document.getElementById('thumbnail');
-        if (data.Thumbnail) {
+        if (data.Thumbnail && data.Thumbnail.startsWith('http')) {
             thumb.src = data.Thumbnail;
             thumb.style.display = 'block';
-            container.style.backgroundImage = `linear-gradient(to right, rgba(32, 32, 32, 0.95), rgba(32, 32, 32, 0.8)), url('${data.Thumbnail}')`;
-            container.style.backgroundSize = 'cover';
-            container.style.backgroundPosition = 'center';
+            // Darker overlay for better text contrast
+            container.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6)), url('${data.Thumbnail}')`;
         } else {
-            thumb.style.display = 'none';
+            thumb.src = 'https://www.gstatic.com/images/branding/product/1x/youtube_music_64dp.png';
+            thumb.style.display = 'block';
             container.style.backgroundImage = 'none';
         }
         

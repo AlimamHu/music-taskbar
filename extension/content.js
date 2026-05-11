@@ -15,8 +15,38 @@ function sendUpdate() {
         duration = video.duration;
     }
 
+    // Thumbnail Selection
+    thumbnail = "";
+    
+    if (window.location.host.includes('music.youtube.com')) {
+        // YouTube Music
+        thumbnail = document.querySelector('.image.ytmusic-player-bar img')?.src || 
+                    document.querySelector('#thumbnail img')?.src ||
+                    document.querySelector('ytmusic-player img#img')?.src;
+    } else if (window.location.host.includes('youtube.com')) {
+        // YouTube Video
+        const videoId = new URLSearchParams(window.location.search).get('v');
+        if (videoId) {
+            thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        }
+    } else if (window.location.host.includes('spotify.com')) {
+        // Spotify
+        thumbnail = document.querySelector('[data-testid="now-playing-widget"] img')?.src ||
+                    document.querySelector('.now-playing-widget img')?.src;
+    }
+
+    if (window.location.host.includes('music.youtube.com')) {
+        title = document.querySelector('.ytmusic-player-bar .title')?.innerText;
+        artist = document.querySelector('.ytmusic-player-bar .byline')?.innerText;
+        const progressEl = document.querySelector('#progress-bar');
+        if (progressEl) {
+            progress = progressEl.value;
+            duration = progressEl.max;
+        }
+    }
+
     // Method 1: Try MediaSession API (Modern)
-    if (navigator.mediaSession && navigator.mediaSession.metadata) {
+    if (!title && navigator.mediaSession && navigator.mediaSession.metadata) {
         title = navigator.mediaSession.metadata.title;
         artist = navigator.mediaSession.metadata.artist;
         const artworks = navigator.mediaSession.metadata.artwork;
@@ -58,15 +88,23 @@ function sendUpdate() {
         if (title !== lastData.Title || Math.abs(progress - lastData.Progress) > 1) {
             lastData = payload;
             
-            // Send to background script instead of fetching directly
-            chrome.runtime.sendMessage({
-                type: 'MEDIA_UPDATE',
-                data: payload
-            });
+            // Send to background script safely
+            try {
+                if (chrome.runtime && chrome.runtime.id) {
+                    chrome.runtime.sendMessage({
+                        type: 'MEDIA_UPDATE',
+                        data: payload
+                    });
+                } else {
+                    clearInterval(updateInterval); // Stop if extension was reloaded/removed
+                }
+            } catch (e) {
+                clearInterval(updateInterval);
+            }
         }
     }
 }
 
 // Check every 1 second for progress updates
-setInterval(sendUpdate, 1000);
+const updateInterval = setInterval(sendUpdate, 1000);
 sendUpdate();

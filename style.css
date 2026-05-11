@@ -3,8 +3,8 @@
     --hover-color: rgba(255, 255, 255, 0.1);
     --text-primary: #ffffff;
     --text-secondary: rgba(255, 255, 255, 0.6);
-    --accent-spotify: #1DB954;
-    --accent-youtube: #FF0000;
+    --accent-spotify: #00ff00; /* Vibrant Glowing Green */
+    --accent-youtube: #00ff00; /* Forcing green for user preference */
 }
 
 * {
@@ -23,17 +23,21 @@ body {
 
 .container {
     height: 40px;
-    background: var(--bg-color);
-    backdrop-filter: blur(10px);
+    background: rgba(15, 15, 15, 0.6);
+    backdrop-filter: blur(20px);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    justify-content: flex-start;
+    padding: 0 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     -webkit-app-region: drag;
-    transition: width 0.3s ease;
+    transition: all 0.3s ease;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
 }
 
 /* Mini Mode Styles */
@@ -97,22 +101,20 @@ body {
 #progress-bar {
     height: 100%;
     width: 0%;
-    background: var(--accent-spotify);
-    transition: width 0.3s linear;
-    box-shadow: 0 0 8px var(--accent-spotify);
+    background: #00ff00; /* Neon Green */
+    transition: width 0.1s linear;
+    box-shadow: 0 0 15px #00ff00, 0 0 5px #00ff00;
+    border-radius: 2px;
 }
 
-.source-youtube ~ #progress-container #progress-bar {
-    background: var(--accent-youtube);
-    box-shadow: 0 0 8px var(--accent-youtube);
-}
+/* Removed source-specific bar colors as per user request for green */
 
 .track-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex: 1;
+    min-width: 0;
     font-size: 12px;
-    max-width: 240px;
     margin-right: 10px;
 }
 
@@ -137,7 +139,8 @@ body {
 
 .controls {
     display: flex;
-    gap: 2px;
+    gap: 0;
+    flex-shrink: 0;
     -webkit-app-region: no-drag;
 }
 

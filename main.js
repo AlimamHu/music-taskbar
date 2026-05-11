@@ -5,6 +5,7 @@ const http = require('http');
 
 let mainWindow;
 let lastGoodUpdate = 0; // Timestamp of last detailed update (Extension or SMTC)
+let lastReceivedTitle = ""; // For window focusing
 
 // Extension Listener
 function startServer() {
@@ -28,6 +29,7 @@ function startServer() {
                     const data = JSON.parse(body);
                     if (mainWindow && data.Title) {
                         lastGoodUpdate = Date.now(); // Mark as high-quality data
+                        lastReceivedTitle = data.Title;
                         mainWindow.webContents.send('media-update', data);
                     }
                 } catch (e) {
@@ -47,7 +49,7 @@ function createWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   
   // Controller dimensions
-  const winWidth = 350;
+  const winWidth = 400;
   const winHeight = 50; 
 
   mainWindow = new BrowserWindow({
@@ -122,6 +124,7 @@ function startMediaPolling() {
 
           if (!isWeakData || timeSinceGoodUpdate > 5000) {
               if (!isWeakData) lastGoodUpdate = Date.now();
+              lastReceivedTitle = foundData.Title;
               mainWindow.webContents.send('media-update', foundData);
           }
         }
@@ -135,17 +138,31 @@ function startMediaPolling() {
 // Media Control Listeners
 ipcMain.on('media-command', (event, command) => {
   let key;
-  switch(command) {
-    case 'play-pause': key = '179'; break; // Media Play/Pause
-    case 'next': key = '176'; break;       // Media Next
-    case 'prev': key = '177'; break;       // Media Previous
-  }
+  if (command === 'play-pause') key = 179;
+  if (command === 'next') key = 176;
+  if (command === 'prev') key = 177;
 
   if (key) {
-    // Uses PowerShell to send a global media key to Windows
-    const script = `$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]${key})`;
-    exec(`powershell -command "${script}"`);
+    exec(`powershell -command "$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]${key})"`);
   }
+});
+
+ipcMain.on('focus-source', () => {
+    // Try to find the window by the current playing title
+    const cleanTitle = lastReceivedTitle.split(' - ')[0].replace(/"/g, ''); 
+    const psScript = `
+      $wshell = New-Object -ComObject WScript.Shell;
+      $title = "${cleanTitle}";
+      $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*$title*" -and $_.MainWindowTitle -ne "" } | Select-Object -First 1;
+      if ($proc) {
+        $wshell.AppActivate($proc.Id)
+      } else {
+        # Fallback to player processes
+        $fallback = Get-Process | Where-Object { ($_.ProcessName -match "chrome|msedge|spotify") -and $_.MainWindowTitle -ne "" } | Select-Object -First 1;
+        if ($fallback) { $wshell.AppActivate($fallback.Id) }
+      }
+    `;
+    exec(`powershell -command "${psScript.replace(/\n/g, '')}"`);
 });
 
 ipcMain.on('window-command', (event, command) => {
