@@ -24,8 +24,8 @@ closeApp.addEventListener('click', () => {
     ipcRenderer.send('window-command', 'close');
 });
 
-// Double click to open source
-container.addEventListener('dblclick', () => {
+// Double click on track info to open source
+document.getElementById('track-section').addEventListener('dblclick', () => {
     const tabId = lastRealData ? lastRealData.tabId : null;
     ipcRenderer.send('focus-source', tabId);
 });
@@ -140,11 +140,15 @@ function renderMedia(data) {
     }
     
     // Update Source Icon
+    const isYTMusic = data.Method === 'YouTube Music';
     const isYouTube = data.Title.toLowerCase().includes('youtube') || 
                       (data.Artist && data.Artist.toLowerCase().includes('youtube')) || 
-                      data.Method === 'YouTube' || data.Method === 'YouTube Music';
+                      data.Method === 'YouTube';
                       
-    if (isYouTube) {
+    if (isYTMusic) {
+        sourceIcon.innerText = "♬"; // Music note for YT Music
+        sourceIcon.className = "source-ytmusic";
+    } else if (isYouTube) {
         sourceIcon.innerText = "▶";
         sourceIcon.className = "source-youtube";
     } else {
@@ -215,6 +219,11 @@ ipcRenderer.on('sessions-update', (event, sessions) => {
         item.addEventListener('click', () => {
             ipcRenderer.send('switch-tab', session.tabId);
             tabsPanel.classList.remove('open');
+        });
+
+        item.addEventListener('dblclick', (e) => {
+            e.stopPropagation(); // Prevent trigger click
+            ipcRenderer.send('focus-source', session.tabId);
         });
         
         tabsList.appendChild(item);

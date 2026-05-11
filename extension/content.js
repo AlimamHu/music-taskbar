@@ -18,20 +18,25 @@ function sendUpdate() {
 
     // --- 1. YouTube Music Specific ---
     if (window.location.host.includes('music.youtube.com')) {
-        title = document.querySelector('.ytmusic-player-bar .title')?.innerText;
-        artist = document.querySelector('.ytmusic-player-bar .byline')?.innerText;
+        title = document.querySelector('yt-formatted-string.title.ytmusic-player-bar')?.innerText ||
+                document.querySelector('.ytmusic-player-bar .title')?.innerText;
         
-        // Thumbnail
-        const thumbEl = document.querySelector('.image.ytmusic-player-bar img') || 
-                        document.querySelector('#thumbnail img') ||
+        artist = document.querySelector('yt-formatted-string.byline.ytmusic-player-bar')?.title ||
+                 document.querySelector('yt-formatted-string.byline.ytmusic-player-bar')?.innerText ||
+                 document.querySelector('.ytmusic-player-bar .byline')?.innerText;
+        
+        // Thumbnail - YouTube Music uses a specific image element in the player bar
+        const thumbEl = document.querySelector('ytmusic-player-bar img.image') || 
+                        document.querySelector('.image.ytmusic-player-bar img') ||
+                        document.querySelector('#song-image img') ||
                         document.querySelector('ytmusic-player img#img');
         if (thumbEl) thumbnail = thumbEl.src;
 
-        // Progress (YouTube Music uses paper-progress)
-        const progressEl = document.querySelector('tp-yt-paper-progress#progress-bar');
-        if (progressEl) {
-            progress = progressEl.value || progress;
-            duration = progressEl.max || duration;
+        // Progress
+        const video = document.querySelector('video');
+        if (video) {
+            progress = video.currentTime;
+            duration = video.duration;
         }
     } 
     // --- 2. Standard YouTube ---
@@ -85,7 +90,8 @@ function sendUpdate() {
             Status: isPlaying ? 'Playing' : 'Paused',
             Progress: progress,
             Duration: duration,
-            Method: window.location.host.includes('youtube') ? 'YouTube' : 'Spotify' 
+            Method: window.location.host.includes('music.youtube.com') ? 'YouTube Music' : 
+                    window.location.host.includes('youtube.com') ? 'YouTube' : 'Spotify' 
         };
 
         const now = Date.now();

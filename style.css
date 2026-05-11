@@ -117,6 +117,7 @@ body {
     min-width: 0;
     font-size: 12px;
     margin-right: 10px;
+    -webkit-app-region: no-drag;
 }
 
 #source-icon {

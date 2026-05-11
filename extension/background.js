@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         const payload = {
             current: request.data,
-            allSessions: Object.values(sessions)
+            allSessions: Object.values(sessions).sort((a, b) => a.tabId - b.tabId)
         };
 
         fetch('http://localhost:3456/', {
@@ -33,30 +33,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             body: JSON.stringify(payload)
         })
         .then(res => res.json())
-        .then(cmd => {
-            if (cmd && cmd.command === 'play-tab') {
-                const targetTabId = parseInt(cmd.tabId);
-                
-                // 1. If there's an active tab that isn't the target, pause it first
-                if (activeTabId !== null && activeTabId !== targetTabId) {
-                    chrome.tabs.sendMessage(activeTabId, { command: 'pause' }).catch(() => {});
-                }
-                
-                // 2. Tell the target tab to play
-                chrome.tabs.sendMessage(targetTabId, { command: 'play' }).catch(() => {
-                    console.error('Failed to send play to tab', targetTabId);
-                });
-                
-                activeTabId = targetTabId;
-            } else if (cmd && cmd.command === 'focus-tab') {
-                const targetTabId = parseInt(cmd.tabId);
-                chrome.tabs.get(targetTabId, (tab) => {
-                    if (tab) {
-                        chrome.tabs.update(targetTabId, { active: true });
-                        chrome.windows.update(tab.windowId, { focused: true });
+        .then(commands => {
+            if (!Array.isArray(commands)) return;
+            
+            commands.forEach(cmd => {
+                if (cmd.command === 'play-tab') {
+                    const targetTabId = parseInt(cmd.tabId);
+                    if (activeTabId !== null && activeTabId !== targetTabId) {
+                        chrome.tabs.sendMessage(activeTabId, { command: 'pause' }).catch(() => {});
                     }
-                });
-            }
+                    chrome.tabs.sendMessage(targetTabId, { command: 'play' }).catch(() => {});
+                    activeTabId = targetTabId;
+                } else if (cmd.command === 'focus-tab') {
+                    const targetTabId = parseInt(cmd.tabId);
+                    chrome.tabs.get(targetTabId, (tab) => {
+                        if (tab) {
+                            chrome.tabs.update(targetTabId, { active: true });
+                            chrome.windows.update(tab.windowId, { 
+                                focused: true,
+                                drawAttention: true
+                            });
+                        }
+                    });
+                }
+            });
         })
         .catch(err => {});
     }

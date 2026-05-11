@@ -53,10 +53,12 @@ function startServer() {
                     console.error('Failed to parse POST body:', e);
                 }
                 
-                // Send back any pending commands
-                const nextCmd = commandQueue.shift() || { status: 'ok' };
+                // Send back all pending commands
+                const commands = [...commandQueue];
+                commandQueue.length = 0; // Clear queue
+                
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(nextCmd));
+                res.end(JSON.stringify(commands));
             });
         } else {
             res.writeHead(404);
