@@ -97,6 +97,14 @@ body {
     width: 100%;
     height: 2px;
     background: rgba(255, 255, 255, 0.1);
+    -webkit-app-region: no-drag;
+    cursor: pointer;
+    transition: height 0.2s;
+    z-index: 10;
+}
+
+.container:hover #progress-container {
+    height: 6px;
 }
 
 #progress-bar {
@@ -106,6 +114,11 @@ body {
     transition: width 0.1s linear;
     box-shadow: 0 0 15px #00ff00, 0 0 5px #00ff00;
     border-radius: 2px;
+}
+
+#progress-bar.seeking {
+    background: #ffffff !important;
+    box-shadow: 0 0 15px #ffffff, 0 0 5px #ffffff;
 }
 
 /* Visualizer Styles */

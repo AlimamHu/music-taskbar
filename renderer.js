@@ -12,7 +12,46 @@ const container = document.getElementById('app-container');
 const toggleMini = document.getElementById('toggle-mini');
 const closeApp = document.getElementById('close-app');
 const progressBar = document.getElementById('progress-bar');
+const progressContainer = document.getElementById('progress-container');
 const vizContainer = document.getElementById('visualizer-container');
+
+let lastSeekTime = 0;
+const SEEK_LOCK_DURATION = 3000; // 3 seconds
+
+function isSeeking() {
+    return (Date.now() - lastSeekTime) < SEEK_LOCK_DURATION;
+}
+
+// Progress Bar Seeking
+progressContainer.addEventListener('click', (e) => {
+    if (!lastRealData || !lastRealData.Duration) return;
+    
+    const rect = progressContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, x / width));
+    
+    const seekTime = percentage * lastRealData.Duration;
+    
+    // Lock updates to prevent jumping back
+    lastSeekTime = Date.now();
+
+    // Visual feedback: Change color to show it's seeking
+    progressBar.classList.add('seeking');
+    setTimeout(() => {
+        progressBar.classList.remove('seeking');
+    }, SEEK_LOCK_DURATION);
+
+    ipcRenderer.send('media-command', { 
+        command: 'seek', 
+        time: seekTime, 
+        tabId: lastRealData.tabId 
+    });
+    
+    // Optimistic UI update
+    progressBar.style.width = (percentage * 100) + '%';
+    lastRealData.Progress = seekTime;
+});
 
 let isPlaying = false;
 let allSessions = [];
@@ -99,6 +138,14 @@ async function getDominantColor(url) {
 async function renderMedia(data) {
     if (!data || !data.Title) return;
 
+    // 1. Update Progress IMMEDIATELY (Before color extraction delay)
+    if (data.Duration > 0 && !isSeeking()) {
+        const percent = (data.Progress / data.Duration) * 100;
+        progressBar.style.width = percent + '%';
+    } else if (data.Duration <= 0) {
+        progressBar.style.width = '0%';
+    }
+
     // Apply Settings
     const settings = data.settings || { dynamicTheming: true, visualizer: true, scrollingTitle: true };
     
@@ -179,13 +226,7 @@ async function renderMedia(data) {
         container.style.backgroundImage = 'none';
     }
     
-    // Update Progress
-    if (data.Duration > 0) {
-        const percent = (data.Progress / data.Duration) * 100;
-        progressBar.style.width = percent + '%';
-    } else {
-        progressBar.style.width = '0%';
-    }
+    // Progress bar updated at top of function
 
     // Update Source Icon
     const isYTMusic = data.Method === 'YouTube Music';
@@ -274,6 +315,10 @@ ipcRenderer.on('sessions-update', (event, sessions) => {
 });
 
 ipcRenderer.on('media-update', (event, data) => {
+    if (isSeeking() && lastRealData) {
+        // Keep our optimistic progress while seeking
+        data.Progress = lastRealData.Progress;
+    }
     lastRealData = data;
     if (peekIndex === -1) renderMedia(data);
 });

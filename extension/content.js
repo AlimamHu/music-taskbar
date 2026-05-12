@@ -157,5 +157,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
             setTimeout(sendUpdate, 500); // Send sync update after play attempt
         }
+    } else if (request.command === 'seek') {
+        const video = document.querySelector('video');
+        if (video) {
+            video.currentTime = request.time;
+            // Delay update to let browser sync the new currentTime
+            setTimeout(sendUpdate, 200);
+        }
     }
 });

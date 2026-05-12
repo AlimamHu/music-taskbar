@@ -24,13 +24,21 @@ function startServer() {
             return;
         }
 
+        if (req.method === 'GET' && req.url === '/commands') {
+            const commands = [...commandQueue];
+            commandQueue.length = 0;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(commands));
+            return;
+        }
+
         if (req.method === 'POST') {
             let body = '';
             req.on('data', chunk => { body += chunk.toString(); });
             req.on('end', () => {
                 try {
                     const payload = JSON.parse(body);
-                    const data = payload.current || payload; // Support old and new format
+                    const data = payload.current || payload; 
                     
                     if (mainWindow && data.Title) {
                         const isPlaying = data.Status === 'Playing' || data.Status === 'playing';
@@ -44,7 +52,6 @@ function startServer() {
                             mainWindow.webContents.send('media-update', data);
                         }
 
-                        // Send all sessions to renderer
                         if (payload.allSessions) {
                             mainWindow.webContents.send('sessions-update', payload.allSessions);
                         }
@@ -53,9 +60,8 @@ function startServer() {
                     console.error('Failed to parse POST body:', e);
                 }
                 
-                // Send back all pending commands
                 const commands = [...commandQueue];
-                commandQueue.length = 0; // Clear queue
+                commandQueue.length = 0; 
                 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(commands));
@@ -170,7 +176,14 @@ function startMediaPolling() {
 }
 
 // Media Control Listeners
-ipcMain.on('media-command', (event, command) => {
+ipcMain.on('media-command', (event, arg) => {
+  const command = typeof arg === 'string' ? arg : arg.command;
+  
+  if (command === 'seek') {
+    commandQueue.push({ command: 'seek', time: arg.time, tabId: arg.tabId });
+    return;
+  }
+
   let key;
   if (command === 'play-pause') key = 179;
   if (command === 'next') key = 176;
