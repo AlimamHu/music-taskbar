@@ -115,33 +115,50 @@ closeTabs.addEventListener('click', () => {
     tabsPanel.classList.remove('open');
 });
 
-// Dynamic Theming helper
+// Shared canvas for memory efficiency
+const themeCanvas = document.createElement('canvas');
+const themeCtx = themeCanvas.getContext('2d', { willReadFrequently: true });
+themeCanvas.width = 10;
+themeCanvas.height = 10;
+
 async function getDominantColor(url) {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.src = url;
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 10;
-            canvas.height = 10;
-            ctx.drawImage(img, 0, 0, 10, 10);
-            const data = ctx.getImageData(0, 0, 10, 10).data;
+            themeCtx.clearRect(0, 0, 10, 10);
+            themeCtx.drawImage(img, 0, 0, 10, 10);
+            const data = themeCtx.getImageData(0, 0, 10, 10).data;
             
             let r = 0, g = 0, b = 0;
             for (let i = 0; i < data.length; i += 4) {
                 r += data[i]; g += data[i+1]; b += data[i+2];
             }
             const count = data.length / 4;
+            
+            // Cleanup
+            img.onload = null;
+            img.onerror = null;
+            img.src = ""; 
+            
             resolve(`rgb(${Math.round(r/count)}, ${Math.round(g/count)}, ${Math.round(b/count)})`);
         };
-        img.onerror = () => resolve('#00ff00');
+        img.onerror = () => {
+            img.onload = null;
+            img.onerror = null;
+            resolve('#00ff00');
+        };
     });
 }
 
+let lastRenderedSourceId = "";
+
 async function renderMedia(data) {
     if (!data || !data.Title) return;
+
+    const currentSourceId = (data.Title || '') + (data.Artist || '') + (data.Status || '') + (data.Thumbnail || '');
+    const isNewTrack = (data.Title || '') + (data.Artist || '') !== (lastRealData?.Title || '') + (lastRealData?.Artist || '');
 
     // 1. Update Progress IMMEDIATELY (Before color extraction delay)
     if (data.Duration > 0 && !isSeeking()) {
@@ -150,6 +167,9 @@ async function renderMedia(data) {
     } else if (data.Duration <= 0) {
         progressBar.style.width = '0%';
     }
+
+    // 2. Optimization: If this exact state was already rendered, stop here
+    if (currentSourceId === lastRenderedSourceId) return;
 
     // Apply Settings
     const settings = data.settings || { 
@@ -263,6 +283,8 @@ async function renderMedia(data) {
         sourceIcon.innerText = "●";
         sourceIcon.className = "source-spotify";
     }
+
+    lastRenderedSourceId = currentSourceId;
 }
 
 // Scroll to Peek

@@ -1,5 +1,5 @@
 const { app, BrowserWindow, screen, ipcMain, globalShortcut } = require('electron');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 
@@ -138,32 +138,37 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
 
+let psProcess = null;
+
 function startMediaPolling() {
   const scriptPath = path.join(__dirname, 'get_media.ps1');
   
-  setInterval(() => {
-    // Use the optimized PowerShell script instead of tasklist
-    exec(`powershell -ExecutionPolicy Bypass -File "${scriptPath}"`, (error, stdout) => {
-      if (error) {
-        console.error('PS Error:', error);
-        return;
-      }
+  if (psProcess) {
+    psProcess.kill();
+  }
 
+  psProcess = spawn('powershell.exe', [
+    '-ExecutionPolicy', 'Bypass',
+    '-File', scriptPath
+  ]);
+
+  psProcess.stdout.on('data', (data) => {
+    const output = data.toString().trim();
+    if (!output || output === "null") return;
+
+    // Split by newlines in case multiple JSON objects came in at once
+    const lines = output.split('\n');
+    lines.forEach(line => {
       try {
-        const trimmed = stdout.trim();
-        if (!trimmed || trimmed === "null") return;
-
-        const foundData = JSON.parse(trimmed);
+        const foundData = JSON.parse(line.trim());
         if (foundData && foundData.Title && mainWindow) {
           const isPlaying = foundData.Status === 'Playing' || foundData.Status === 'playing';
           const sourceId = foundData.Title + foundData.Artist;
           
-          // Only use Method 2 (Window Title) if we haven't had a good update in 5 seconds
           const isWeakData = (foundData.Method === 'Spotify' || foundData.Method === 'YouTube');
           const timeSinceGoodUpdate = Date.now() - lastGoodUpdate;
 
           if (!isWeakData || timeSinceGoodUpdate > 5000) {
-              // Priority check across sources
               if (isPlaying || currentPlaybackStatus !== 'Playing' || currentPlaybackSource === sourceId) {
                   currentPlaybackStatus = isPlaying ? 'Playing' : 'Paused';
                   currentPlaybackSource = sourceId;
@@ -175,10 +180,19 @@ function startMediaPolling() {
           }
         }
       } catch (e) {
-        console.error('Parse Error:', e, 'Raw output:', stdout);
+        // Silently skip partial/invalid JSON
       }
     });
-  }, 1000); // Check every 1s
+  });
+
+  psProcess.stderr.on('data', (data) => {
+    console.error('PS Stderr:', data.toString());
+  });
+
+  psProcess.on('close', (code) => {
+    console.log(`PS process exited with code ${code}, restarting...`);
+    setTimeout(startMediaPolling, 2000);
+  });
 }
 
 // Media Control Listeners
