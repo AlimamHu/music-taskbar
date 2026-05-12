@@ -60,12 +60,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             activeTabId = tabId;
         }
 
-        chrome.storage.local.get(['dynamicTheming', 'visualizer', 'scrollingTitle'], (settings) => {
+        chrome.storage.local.get(['dynamicTheming', 'visualizer', 'scrollingTitle', 'progressStyle', 'posX', 'posY', 'lockPosition'], (settings) => {
             request.data.tabId = tabId;
             request.data.settings = {
                 dynamicTheming: settings.dynamicTheming !== false,
                 visualizer: settings.visualizer !== false,
-                scrollingTitle: settings.scrollingTitle !== false
+                scrollingTitle: settings.scrollingTitle !== false,
+                progressStyle: settings.progressStyle || 'classic',
+                posX: settings.posX,
+                posY: settings.posY,
+                lockPosition: settings.lockPosition || false
             };
             
             const payload = {

@@ -95,6 +95,32 @@
         </label>
     </div>
 
+    <div class="option" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+        <span>Progress Style</span>
+        <select id="progressStyle" style="width: 100%; background: #222; color: white; border: 1px solid #333; padding: 5px; font-size: 11px; border-radius: 4px;">
+            <option value="classic">Classic Line</option>
+            <option value="modern">Modern Wave</option>
+            <option value="spectrum">Neon Spectrum</option>
+        </select>
+    </div>
+
+    <div class="header" style="margin-top: 15px;">Window Positioning</div>
+    <div class="option">
+        <span>X Position</span>
+        <input type="number" id="posX" style="width: 60px; background: #222; color: white; border: 1px solid #333; border-radius: 4px; padding: 2px 5px; font-size: 11px;">
+    </div>
+    <div class="option">
+        <span>Y Position</span>
+        <input type="number" id="posY" style="width: 60px; background: #222; color: white; border: 1px solid #333; border-radius: 4px; padding: 2px 5px; font-size: 11px;">
+    </div>
+    <div class="option">
+        <span>Lock Position</span>
+        <label class="switch">
+            <input type="checkbox" id="lockPosition">
+            <span class="slider"></span>
+        </label>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 </html>

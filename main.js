@@ -49,6 +49,12 @@ function startServer() {
                             currentPlaybackSource = sourceId;
                             lastGoodUpdate = Date.now();
                             lastReceivedTitle = data.Title;
+
+                            // Apply position if specified and not locked
+                            if (data.settings && !isNaN(data.settings.posX) && !isNaN(data.settings.posY)) {
+                                mainWindow.setPosition(data.settings.posX, data.settings.posY);
+                            }
+
                             mainWindow.webContents.send('media-update', data);
                         }
 

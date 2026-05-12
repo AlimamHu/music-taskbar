@@ -152,8 +152,24 @@ async function renderMedia(data) {
     }
 
     // Apply Settings
-    const settings = data.settings || { dynamicTheming: true, visualizer: true, scrollingTitle: true };
+    const settings = data.settings || { 
+        dynamicTheming: true, 
+        visualizer: true, 
+        scrollingTitle: true,
+        progressStyle: 'classic'
+    };
+
+    // Apply Progress Style
+    const progressStyle = settings.progressStyle || 'classic';
+    progressContainer.className = 'style-' + progressStyle;
     
+    // Handle Drag Locking
+    if (settings.lockPosition) {
+        document.querySelector('.container').style.webkitAppRegion = 'no-drag';
+    } else {
+        document.querySelector('.container').style.webkitAppRegion = 'drag';
+    }
+
     // Toggle Visualizer
     vizContainer.style.display = settings.visualizer ? 'flex' : 'none';
     if (data.Status === 'Playing') {
