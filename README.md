@@ -56,5 +56,22 @@ Control the experience via the Chrome Extension popup. Toggle features on/off in
 - **Chrome Extension (MV3)**: Metadata extraction and IPC communication.
 - **Vanilla JS & CSS**: High-performance UI rendering and animations.
 
+## 🚀 How to Launch
+
+### 1. Developer Mode (Recommended for testing)
+Open your terminal and run:
+```bash
+npm start
+```
+
+### 2. Quick Launch (One-Click)
+I've created a **`launch.bat`** file in the project folder. You can simply **double-click** it to start the controller without opening a terminal.
+
+### 3. Build a Standalone App (.exe)
+If you want to use it as a permanent app on your computer, you can package it into a single `.exe` file:
+1. Run `npm install --save-dev electron-builder`
+2. Run `npx electron-builder`
+3. Your installer will be in the `dist` folder.
+
 ---
 *Created with ❤️ by Antigravity*
