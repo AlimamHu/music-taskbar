@@ -164,5 +164,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // Delay update to let browser sync the new currentTime
             setTimeout(sendUpdate, 200);
         }
+    } else if (request.command === 'shuffle') {
+        const shuffleBtns = [
+            '[data-testid="control-button-shuffle"]', // Spotify
+            '.shuffle.ytmusic-player-bar', // YouTube Music
+            '[aria-label="Shuffle"]', // Generic
+            '.ytp-shuffle-button' // YouTube Playlist
+        ];
+        for (let selector of shuffleBtns) {
+            const btn = document.querySelector(selector);
+            if (btn) {
+                btn.click();
+                break;
+            }
+        }
     }
 });

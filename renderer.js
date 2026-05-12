@@ -95,6 +95,11 @@ nextBtn.addEventListener('click', () => {
     ipcRenderer.send('media-command', 'next');
 });
 
+document.getElementById('shuffle').addEventListener('click', () => {
+    const tabId = lastRealData ? lastRealData.tabId : null;
+    ipcRenderer.send('media-command', { command: 'shuffle', tabId: tabId });
+});
+
 // Tabs Panel Toggle
 const tabsBtn = document.getElementById('show-tabs');
 const tabsPanel = document.getElementById('tabs-panel');

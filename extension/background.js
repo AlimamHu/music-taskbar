@@ -29,6 +29,11 @@ function handleCommands(commands) {
             if (!isNaN(targetTabId)) {
                 chrome.tabs.sendMessage(targetTabId, { command: 'seek', time: cmd.time }).catch(() => {});
             }
+        } else if (cmd.command === 'shuffle') {
+            const targetTabId = parseInt(cmd.tabId);
+            if (!isNaN(targetTabId)) {
+                chrome.tabs.sendMessage(targetTabId, { command: 'shuffle' }).catch(() => {});
+            }
         }
     });
 }

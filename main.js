@@ -184,6 +184,11 @@ ipcMain.on('media-command', (event, arg) => {
     return;
   }
 
+  if (command === 'shuffle') {
+    commandQueue.push({ command: 'shuffle', tabId: arg.tabId });
+    return;
+  }
+
   let key;
   if (command === 'play-pause') key = 179;
   if (command === 'next') key = 176;
